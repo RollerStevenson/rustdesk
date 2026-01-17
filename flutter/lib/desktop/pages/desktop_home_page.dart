@@ -429,56 +429,27 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     );
   }
 
-  Widget buildHelpCards(String updateUrl) {
-    // srwe: Install-Button und Update-Hinweis komplett entfernt
-//    if (!bind.isCustomClient() &&
-//        updateUrl.isNotEmpty &&
-//        !isCardClosed &&
-//        bind.mainUriPrefixSync().contains('rustdesk')) {
-//      final isToUpdate = (isWindows || isMacOS) && bind.mainIsInstalled();
-//      String btnText = isToUpdate ? 'Update' : 'Download';
-//      GestureTapCallback onPressed = () async {
-//        final Uri url = Uri.parse('https://rustdesk.com/download');
-//        await launchUrl(url);
-//      };
-//      if (isToUpdate) {
-//        onPressed = () {
-//          handleUpdate(updateUrl);
-//        };
-//      }
-//      return buildInstallCard(
-//          "Status",
-//          "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
-//          btnText,
-//          onPressed,
-//          closeButton: true,
-//          help: isToUpdate ? 'Changelog' : null,
-//          link: isToUpdate
-//              ? 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}'
-//              : null);
-//    }
-//    if (systemError.isNotEmpty) {
-//      return buildInstallCard("", systemError, "", () {});
-//    }
+Widget buildHelpCards(String updateUrl) {
+    // srwe: --- TEIL 1: Update-Check (DEAKTIVIERT) ---
+    /*
+    if (!bind.isCustomClient() &&
+        updateUrl.isNotEmpty &&
+        !isCardClosed &&
+        bind.mainUriPrefixSync().contains('rustdesk')) {
+       // ... Original Code entfernt ...
+       return Container(); 
+    }
+    */
 
-    // srwe: Install-Button und Update-Hinweis für Windows komplett entfernt
-//    if (isWindows && !bind.isDisableInstallation()) {
-//      if (!bind.mainIsInstalled()) {
-//        return buildInstallCard(
-//            "", bind.isOutgoingOnly() ? "" : "install_tip", "Install",
-//            () async {
-//          await rustDeskWinManager.closeAllSubWindows();
-//          bind.mainGotoInstall();
-//        });
-//      } else if (bind.mainIsInstalledLowerVersion()) {
-//        return buildInstallCard(
-//            "Status", "Your installation is lower version.", "Click to upgrade",
-//            () async {
-//          await rustDeskWinManager.closeAllSubWindows();
-//          bind.mainUpdateMe();
-//        });
-//      }
-//    } else
+    if (systemError.isNotEmpty) {
+      return buildInstallCard("", systemError, "", () {});
+    }
+
+    // srwe: --- TEIL 2: Windows Installation (DEAKTIVIERT) ---
+    // Hier stand vorher der "if (isWindows...)" Block.
+    // Wir lassen ihn einfach weg, damit kein Install-Button kommt.
+
+    // --- TEIL 3: macOS Berechtigungen (BEIBEHALTEN) ---
     if (isMacOS) {
       final isOutgoingOnly = bind.isOutgoingOnly();
       if (!(isOutgoingOnly || bind.mainIsCanScreenRecording(prompt: false))) {
@@ -500,31 +471,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           watchIsInputMonitoring = true;
         }, help: 'Help', link: translate("doc_mac_permission"));
       }
-    // srwe: Install-Hinweis für macOS komplett entfernt
-//       else if (!isOutgoingOnly &&
-//          !svcStopped.value &&
-//          bind.mainIsInstalled() &&
-//          !bind.mainIsInstalledDaemon(prompt: false)) {
-//        return buildInstallCard("", "install_daemon_tip", "Install", () async {
-//          bind.mainIsInstalledDaemon(prompt: true);
-//        });
-      }
-      //// Disable microphone configuration for macOS. We will request the permission when needed.
-      // else if ((await osxCanRecordAudio() !=
-      //     PermissionAuthorizeType.authorized)) {
-      //   return buildInstallCard("Permissions", "config_microphone", "Configure",
-      //       () async {
-      //     osxRequestAudio();
-      //     watchIsCanRecordAudio = true;
-      //   });
-      // }
+      // srwe: Der "Install Daemon" Teil für Mac wurde hier entfernt.
+      
     } else if (isLinux) {
       if (bind.isOutgoingOnly()) {
         return Container();
       }
       final LinuxCards = <Widget>[];
       if (bind.isSelinuxEnforcing()) {
-        // Check is SELinux enforcing, but show user a tip of is SELinux enabled for simple.
         final keyShowSelinuxHelpTip = "show-selinux-help-tip";
         if (bind.mainGetLocalOption(key: keyShowSelinuxHelpTip) != 'N') {
           LinuxCards.add(buildInstallCard(
@@ -560,13 +514,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         );
       }
     }
+
     if (bind.isIncomingOnly()) {
       return Align(
         alignment: Alignment.centerRight,
         child: OutlinedButton(
           onPressed: () {
-            SystemNavigator.pop(); // Close the application
-            // https://github.com/flutter/flutter/issues/66631
+            SystemNavigator.pop(); 
             if (isWindows) {
               exit(0);
             }
