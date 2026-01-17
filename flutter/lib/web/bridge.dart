@@ -1634,7 +1634,7 @@ class RustdeskImpl {
   }
 
   bool isDisableInstallation({dynamic hint}) {
-    return true;  // srwe: false
+    return false;
   }
 
   Future<bool> isPresetPassword({dynamic hint}) {
