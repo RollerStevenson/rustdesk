@@ -92,6 +92,13 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Patch Config for Custom App Name
+        shell: bash
+        run: |
+          # srwe: Aendert den internen App-Namen zu mob_RustDesk (Windows)
+          sed -i 's/"RustDesk"/"mob_RustDesk"/g' libs/hbb_common/src/config.rs
+          echo "PATCH SUCCESS: App-Name changed to mob_RustDesk"
+
       - name: Restore bridge files
         uses: actions/download-artifact@master
         with:
@@ -587,6 +594,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Patch Config for Custom App Name
+        shell: bash
+        run: |
+          # srwe: Aendert den internen App-Namen zu mob_RustDesk (macOS)
+          sed -i '' 's/"RustDesk"/"mob_RustDesk"/g' libs/hbb_common/src/config.rs
+          echo "PATCH SUCCESS: App-Name changed to mob_RustDesk"
 
       - name: Import the codesign cert
         if: env.MACOS_P12_BASE64 != null
