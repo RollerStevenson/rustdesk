@@ -209,9 +209,9 @@ exclude = ["vdi/host", "examples/custom_plugin"]
 
 [package.metadata.winres]
 LegalCopyright = "Copyright © 2025 Purslane Ltd. All rights reserved."
-ProductName = "RustDesk"
+ProductName = "mob_RustDesk"
 FileDescription = "RustDesk Remote Desktop"
-OriginalFilename = "rustdesk.exe"
+OriginalFilename = "mob_rustdesk.exe"
 
 [target.'cfg(target_os="windows")'.build-dependencies]
 winres = "0.1"
@@ -227,7 +227,7 @@ hound = "3.5"
 docopt = "1.1"
 
 [package.metadata.bundle]
-name = "RustDesk"
+name = "mob_RustDesk"
 identifier = "com.carriez.mob-rustdesk"
 icon = ["res/32x32.png", "res/128x128.png", "res/128x128@2x.png"]
 osx_minimum_system_version = "10.14"
