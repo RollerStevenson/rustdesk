@@ -186,12 +186,19 @@ jobs:
         run: |
           mv rustdesk/rustdesk.exe rustdesk/mob_rustdesk.exe
 
+      - name: DEBUG - Check Windows Files
+        shell: bash
+        run: |
+          echo "=== DEBUG INFO ==="
+          ls -lh rustdesk/
+          echo "=================="
+
       - name: Upload unsigned raw files
         if: env.UPLOAD_ARTIFACT == 'true'
-        uses: actions/upload-artifact@v4 # Verwende v4 fuer Stabilitaet
+        uses: actions/upload-artifact@v4
         with:
           name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
-          path: rustdesk
+          path: rustdesk/mob_rustdesk.exe
 
       - name: Build self-extracted executable
         shell: bash
@@ -205,9 +212,17 @@ jobs:
           mkdir -p ./UnsignedOutput
           mv ./target/release/rustdesk-portable-packer.exe ./UnsignedOutput/mob_rustdesk.exe
 
+      - name: DEBUG - Check Output File
+        shell: bash
+        run: |
+          echo "=== DEBUG INFO ==="
+          ls -R UnsignedOutput/
+          ls -lh UnsignedOutput/mob_rustdesk.exe || echo "ERROR: File missing!"
+          echo "=================="
+
       - name: Upload Unsigned Self-Extracting EXE
         if: env.UPLOAD_ARTIFACT == 'true'
-        uses: actions/upload-artifact@v4 # Verwende v4 + Architektur im Namen
+        uses: actions/upload-artifact@v4
         with:
           name: mob_RustDesk-Windows-SelfExtracting-Unsigned-${{ matrix.job.arch }}
           path: ./UnsignedOutput/mob_rustdesk.exe
@@ -328,8 +343,26 @@ jobs:
           plutil -replace CFBundleName -string "mob_RustDesk" mob_RustDesk.app/Contents/Info.plist
           plutil -replace CFBundleDisplayName -string "mob_RustDesk" mob_RustDesk.app/Contents/Info.plist
 
-      - name: Upload Portable App
-        uses: actions/upload-artifact@v4 # Verwende v4 + Architektur im Namen
+      - name: DEBUG and COMPRESS App Bundle
+        run: |
+          echo "=== DEBUG INFO ==="
+          cd flutter/build/macos/Build/Products/Release/
+          
+          # Größe prüfen
+          du -sh mob_RustDesk.app
+          
+          # Wir packen das Bundle manuell in ein tar.gz
+          # Das verhindert Upload-Fehler bei Ordnern mit vielen kleinen Dateien (503 Error)
+          echo "Compressing..."
+          tar -czf mob_RustDesk-macOS-${{ matrix.job.arch }}.tar.gz mob_RustDesk.app
+          
+          # Prüfen ob das Archiv da ist
+          ls -lh mob_RustDesk-macOS-${{ matrix.job.arch }}.tar.gz
+          echo "=================="
+
+      - name: Upload Portable App (Zipped)
+        uses: actions/upload-artifact@v4
         with:
+          # Wir laden das tar.gz hoch, nicht den Ordner
           name: mob_RustDesk-macOS-App-${{ matrix.job.arch }}
-          path: flutter/build/macos/Build/Products/Release/mob_RustDesk.app
+          path: flutter/build/macos/Build/Products/Release/mob_RustDesk-macOS-${{ matrix.job.arch }}.tar.gz

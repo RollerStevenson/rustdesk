@@ -1,16 +1,25 @@
-name: Test Artifact Upload
+name: Test Large Artifact Upload (100MB)
 
 on: workflow_dispatch
 
 jobs:
-  test-upload:
+  test-large-upload:
     runs-on: ubuntu-latest
     steps:
-      - name: Create dummy file
-        run: echo "GitHub Actions Storage Test" > test.txt
+      - name: Generate 100MB Dummy File
+        run: |
+          echo "Generiere 100MB Testdatei..."
+          # dd schreibt Nullen (/dev/zero) in die Datei
+          # bs=1M (Blockgröße 1 Megabyte) * count=100 = 100MB
+          dd if=/dev/zero of=test-100mb.bin bs=1M count=100
+          
+          echo "Überprüfe Dateigröße:"
+          ls -lh test-100mb.bin
 
-      - name: Try Upload
+      - name: Upload 100MB Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifact
-          path: test.txt
+          name: test-100mb-artifact
+          path: test-100mb.bin
+          # Optional: Kompression level reduzieren, um CPU zu sparen (0-9)
+          # compression-level: 6
