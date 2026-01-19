@@ -1,0 +1,16 @@
+name: Test Artifact Upload
+
+on: workflow_dispatch
+
+jobs:
+  test-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create dummy file
+        run: echo "GitHub Actions Storage Test" > test.txt
+
+      - name: Try Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifact
+          path: test.txt
