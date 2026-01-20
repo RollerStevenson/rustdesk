@@ -45,10 +45,10 @@ END
 #endif    // APSTUDIO_INVOKED
 
 // Manifest-Ressource hinzufügen
-#define CREATEPROCESS_MANIFEST_RESOURCE_ID 1
-#define RT_MANIFEST 24
+//#define CREATEPROCESS_MANIFEST_RESOURCE_ID 1
+//#define RT_MANIFEST 24
 
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "Runner.exe.manifest"
+//CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "Runner.exe.manifest"
 
 /////////////////////////////////////////////////////////////////////////////
 //
