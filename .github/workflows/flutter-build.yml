@@ -74,16 +74,21 @@ jobs:
       - name: Surgical Isolation & ID-Fix (Windows)
         shell: bash
         run: |
-          # 1. Erweiterte Isolation in hbb_common
-          # Wir ersetzen rustdesk in verschiedenen Schreibweisen, um Mutexe und Pipes zu treffen
+          # 1. Tiefe Isolation (Named Pipes, Mutexe und CamelCase Strings)
           CONFIG_FILE="libs/hbb_common/src/config.rs"
-          sed -i 's/rustdesk/mob_rustdesk/g' "$CONFIG_FILE"
+          # Wir ersetzen nun sowohl CamelCase als auch Kleinschreibung
+          sed -i 's/"RustDesk"/"mob_RustDesk"/g' "$CONFIG_FILE"
+          sed -i 's/"rustdesk"/"mob_rustdesk"/g' "$CONFIG_FILE"
           
           # 2. Isolation des Terminals (dein Fundstück)
           # Wir suchen im gesamten src-Verzeichnis nach den Terminal-Pipe-Präfixen
           find libs -name "*.rs" -exec sed -i 's/rustdesk_term/mob_rustdesk_term/g' {} +
-
-          # 3. Manifest für stabile ID (unverändert, da wichtig)
+          
+          # 3. Windows Runner Isolation (Window Class Name Fix)
+          # Dies verhindert, dass der m-Client das Fenster des o-Clients findet
+          find flutter/windows/runner -type f -name "*.cpp" -exec sed -i 's/L"RustDesk"/L"mob_RustDesk"/g' {} +
+          
+          # 4. Manifest für stabile ID (unverändert, da wichtig)
           cat <<EOF > flutter/windows/runner/Runner.exe.manifest
           <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
           <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
