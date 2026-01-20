@@ -74,9 +74,16 @@ jobs:
       - name: Surgical Isolation & ID-Fix (Windows)
         shell: bash
         run: |
-          # 1. Isolation: Pipes/Mutex trennen (Nur Kleinschreibung)
-          sed -i 's/"rustdesk"/"mob_rustdesk"/g' libs/hbb_common/src/config.rs
-          # 2. Manifest überschreiben: Verhindert CVT1100 Duplicate Error und fixiert stabile ID
+          # 1. Erweiterte Isolation in hbb_common
+          # Wir ersetzen rustdesk in verschiedenen Schreibweisen, um Mutexe und Pipes zu treffen
+          CONFIG_FILE="libs/hbb_common/src/config.rs"
+          sed -i 's/rustdesk/mob_rustdesk/g' "$CONFIG_FILE"
+          
+          # 2. Isolation des Terminals (dein Fundstück)
+          # Wir suchen im gesamten src-Verzeichnis nach den Terminal-Pipe-Präfixen
+          find libs -name "*.rs" -exec sed -i 's/rustdesk_term/mob_rustdesk_term/g' {} +
+
+          # 3. Manifest für stabile ID (unverändert, da wichtig)
           cat <<EOF > flutter/windows/runner/Runner.exe.manifest
           <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
           <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
@@ -99,7 +106,7 @@ jobs:
             </compatibility>
           </assembly>
           EOF
-          echo "PATCH SUCCESS: Windows Isolation applied and Manifest updated."
+          echo "PATCH SUCCESS: Deep Isolation applied."
 
       - name: Patch Config for Custom App Name
         shell: bash
