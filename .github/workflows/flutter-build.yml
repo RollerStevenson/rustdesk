@@ -148,8 +148,9 @@ jobs:
         shell: bash
 
       - name: Build rustdesk
+        # srwe: python3 .\build.py --portable --hwcodec --flutter --vram --skip-portable-pack
         run: |
-          python3 .\build.py --portable --hwcodec --flutter --vram --skip-portable-pack
+          # python3 .\build.py --hwcodec --flutter --vram --skip-portable-pack
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
           Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip
           Expand-Archive usbmmidd_v2.zip -DestinationPath .
