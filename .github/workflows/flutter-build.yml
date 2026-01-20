@@ -74,11 +74,9 @@ jobs:
       - name: Surgical Isolation & ID-Fix (Windows)
         shell: bash
         run: |
-          # 1. Isolation: Nur kleingeschriebenes "rustdesk" in hbb_common ersetzen.
-          # Das trennt Named Pipes und Mutexe vom Original-Client.
+          # 1. Isolation: Pipes/Mutex trennen (Nur Kleinschreibung)
           sed -i 's/"rustdesk"/"mob_rustdesk"/g' libs/hbb_common/src/config.rs
-          
-          # 2. Stable ID: Manifest injizieren (Erlaubt Registry-Zugriff auf MachineGuid)
+          # 2. Manifest überschreiben: Verhindert CVT1100 Duplicate Error und fixiert stabile ID
           cat <<EOF > flutter/windows/runner/Runner.exe.manifest
           <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
           <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
@@ -89,6 +87,11 @@ jobs:
                 </requestedPrivileges>
               </security>
             </trustInfo>
+            <application xmlns="urn:schemas-microsoft-com:asm.v3">
+              <windowsSettings>
+                <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+              </windowsSettings>
+            </application>
             <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
               <application>
                 <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
@@ -96,15 +99,13 @@ jobs:
             </compatibility>
           </assembly>
           EOF
-          
-          # 3. Manifest physisch in Runner.rc einbinden
-          echo '#define CREATEPROCESS_MANIFEST_RESOURCE_ID 1' > temp_rc
-          echo '#define RT_MANIFEST 24' >> temp_rc
-          echo 'CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "Runner.exe.manifest"' >> temp_rc
-          cat temp_rc flutter/windows/runner/Runner.rc > flutter/windows/runner/Runner_new.rc
-          mv flutter/windows/runner/Runner_new.rc flutter/windows/runner/Runner.rc
-          
-          echo "PATCH SUCCESS: Windows Isolation and ID-Fix applied."
+          echo "PATCH SUCCESS: Windows Isolation applied and Manifest updated."
+
+      - name: Patch Config for Custom App Name
+        shell: bash
+        run: |
+          sed -i 's/"RustDesk"/"mob_RustDesk"/g' libs/hbb_common/src/config.rs
+          echo "PATCH SUCCESS: App-Name changed to mob_RustDesk"
 
       - name: Restore bridge files
         uses: actions/download-artifact@master
@@ -177,8 +178,9 @@ jobs:
         shell: bash
 
       - name: Build rustdesk
+        # srwe: python3 .\build.py --portable --hwcodec --flutter --vram --skip-portable-pack
         run: |
-          python3 .\build.py --hwcodec --flutter --vram --skip-portable-pack
+          # python3 .\build.py --hwcodec --flutter --vram --skip-portable-pack
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
           Invoke-WebRequest -Uri https://github.com/rustdesk-org/rdev/releases/download/usbmmidd_v2/usbmmidd_v2.zip -OutFile usbmmidd_v2.zip
           Expand-Archive usbmmidd_v2.zip -DestinationPath .
@@ -215,6 +217,19 @@ jobs:
         run: |
           mv rustdesk/rustdesk.exe rustdesk/mob_rustdesk.exe
 
+      - name: DEBUG - Check Windows Binary
+        shell: bash
+        run: |
+          echo "Pruefe auf mob_rustdesk.exe..."
+          ls -lh rustdesk/mob_rustdesk.exe
+
+      - name: Upload unsigned raw files
+        if: env.UPLOAD_ARTIFACT == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
+          path: rustdesk/mob_rustdesk.exe
+
       - name: Build self-extracted executable
         shell: bash
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -226,6 +241,12 @@ jobs:
           popd
           mkdir -p ./UnsignedOutput
           mv ./target/release/rustdesk-portable-packer.exe ./UnsignedOutput/mob_rustdesk.exe
+
+      - name: DEBUG - Check Packed Binary
+        shell: bash
+        run: |
+          echo "Pruefe auf gepackte EXE..."
+          ls -lh UnsignedOutput/mob_rustdesk.exe
 
       - name: Upload Unsigned Self-Extracting EXE
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -272,16 +293,20 @@ jobs:
       - name: Surgical Isolation & ID-Fix (macOS)
         shell: bash
         run: |
-          # 1. Isolation: Sockets trennen
+          # Isolation: Sockets trennen
           sed -i '' 's/"rustdesk"/"mob_rustdesk"/g' libs/hbb_common/src/config.rs
-          
-          # 2. Stable ID: Sandbox deaktivieren für Hardware-Zugriff
+          # Sandbox deaktivieren fuer Hardware-ID Zugriff via IOKit
           ENTITLEMENTS="flutter/macos/Runner/Release.entitlements"
           if [ -f "$ENTITLEMENTS" ]; then
             sed -i '' 's/<true\/>/<false\/>/g' "$ENTITLEMENTS"
           fi
-          
           echo "PATCH SUCCESS: macOS Isolation and Sandbox-Fix applied."
+
+      - name: Patch Config for Custom App Name
+        shell: bash
+        run: |
+          sed -i '' 's/"RustDesk"/"mob_RustDesk"/g' libs/hbb_common/src/config.rs
+          echo "PATCH SUCCESS: App-Name changed to mob_RustDesk"
 
       - name: Install build runtime
         run: |
@@ -357,8 +382,15 @@ jobs:
           plutil -replace CFBundleExecutable -string "mob_RustDesk" mob_RustDesk.app/Contents/Info.plist
           plutil -replace CFBundleName -string "mob_RustDesk" mob_RustDesk.app/Contents/Info.plist
           plutil -replace CFBundleDisplayName -string "mob_RustDesk" mob_RustDesk.app/Contents/Info.plist
-          # Zusätzliche Isolation durch BundleID
           plutil -replace CFBundleIdentifier -string "com.mob.rustdesk" mob_RustDesk.app/Contents/Info.plist
+
+      - name: DEBUG and COMPRESS App Bundle
+        run: |
+          cd flutter/build/macos/Build/Products/Release/
+          echo "Erstelle Archiv fuer:"
+          ls -d mob_RustDesk.app
+          tar -czf mob_RustDesk-macOS-${{ matrix.job.arch }}.tar.gz mob_RustDesk.app
+          ls -lh mob_RustDesk-macOS-${{ matrix.job.arch }}.tar.gz
 
       - name: Upload Portable App
         uses: actions/upload-artifact@v4
