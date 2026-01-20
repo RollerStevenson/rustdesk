@@ -74,23 +74,26 @@ jobs:
       - name: Surgical Isolation & ID-Fix (Windows)
         shell: bash
         run: |
-          # 1. Tiefe Isolation (Named Pipes, Mutexe und CamelCase Strings)
+          # 1. Tiefe Isolation (Named Pipes, Mutexe und Strings)
           CONFIG_FILE="libs/hbb_common/src/config.rs"
-          # Wir ersetzen nun sowohl CamelCase als auch Kleinschreibung
           sed -i 's/"RustDesk"/"mob_RustDesk"/g' "$CONFIG_FILE"
           sed -i 's/"rustdesk"/"mob_rustdesk"/g' "$CONFIG_FILE"
           
-          # 2. Isolation des Terminals (dein Fundstück)
-          # Wir suchen im gesamten src-Verzeichnis nach den Terminal-Pipe-Präfixen
+          # 2. Isolation des Terminals
           find libs -name "*.rs" -exec sed -i 's/rustdesk_term/mob_rustdesk_term/g' {} +
           
-          # 3. Windows Runner Isolation (Window Class Name Fix)
-          # Dies verhindert, dass der m-Client das Fenster des o-Clients findet
-          find flutter/windows/runner -type f -name "*.cpp" -exec sed -i 's/L"RustDesk"/L"mob_RustDesk"/g' {} +
+          # 3. Windows Runner Isolation (Window Class & App Name)
+          MAIN_CPP="flutter/windows/runner/main.cpp"
+          if [ -f "$MAIN_CPP" ]; then
+            # Gezielter Tausch des app_name fuer eindeutige Fensterklassen
+            sed -i 's/std::wstring app_name = L"RustDesk";/std::wstring app_name = L"mob_RustDesk";/g' "$MAIN_CPP"
+            # Fallback fuer alle anderen L-Strings im Runner
+            find flutter/windows/runner -type f -name "*.cpp" -exec sed -i 's/L"RustDesk"/L"mob_RustDesk"/g' {} +
+          fi
           
-          # 4. Manifest für stabile ID (unverändert, da wichtig)
-          cat <<EOF > flutter/windows/runner/Runner.exe.manifest
-          <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          # 4. Vollständiges Manifest (DPI-Awareness & OS-Support)
+          # Wir nutzen printf, um Einrueckungsprobleme mit EOF zu vermeiden
+          printf '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
           <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
             <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
               <security>
@@ -109,9 +112,9 @@ jobs:
                 <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
               </application>
             </compatibility>
-          </assembly>
-          EOF
-          echo "PATCH SUCCESS: Deep Isolation applied."
+          </assembly>' > flutter/windows/runner/Runner.exe.manifest
+          
+          echo "PATCH SUCCESS: Windows Isolation and Full Manifest applied."
 
       - name: Patch Config for Custom App Name
         shell: bash
@@ -305,20 +308,19 @@ jobs:
       - name: Surgical Isolation & ID-Fix (macOS)
         shell: bash
         run: |
-          # Isolation: Sockets trennen
+          # 1. Sockets und Config trennen
           sed -i '' 's/"rustdesk"/"mob_rustdesk"/g' libs/hbb_common/src/config.rs
-          # Sandbox deaktivieren fuer Hardware-ID Zugriff via IOKit
+          sed -i '' 's/"RustDesk"/"mob_RustDesk"/g' libs/hbb_common/src/config.rs
+
+          # 2. Runner Isolation
+          find flutter/macos/Runner -type f -name "*.cpp" -exec sed -i '' 's/"RustDesk"/"mob_RustDesk"/g' {} +
+
+          # 3. Sandbox deaktivieren
           ENTITLEMENTS="flutter/macos/Runner/Release.entitlements"
           if [ -f "$ENTITLEMENTS" ]; then
             sed -i '' 's/<true\/>/<false\/>/g' "$ENTITLEMENTS"
           fi
-          echo "PATCH SUCCESS: macOS Isolation and Sandbox-Fix applied."
-
-      - name: Patch Config for Custom App Name
-        shell: bash
-        run: |
-          sed -i '' 's/"RustDesk"/"mob_RustDesk"/g' libs/hbb_common/src/config.rs
-          echo "PATCH SUCCESS: App-Name changed to mob_RustDesk"
+          echo "PATCH SUCCESS: macOS Isolation applied."
 
       - name: Install build runtime
         run: |
