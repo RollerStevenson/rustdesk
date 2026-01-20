@@ -71,11 +71,41 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Patch Config for Custom App Name
+      - name: Patch for Isolation and Stable ID (Windows)
         shell: bash
         run: |
-          sed -i 's/"RustDesk"/"mob_RustDesk"/g' libs/hbb_common/src/config.rs
-          echo "PATCH SUCCESS: App-Name changed to mob_RustDesk"
+          # 1. Deep Patch hbb_common (Pipes, Mutex, Config-Paths)
+          sed -i 's/pub const APP_NAME: \&str = "RustDesk";/pub const APP_NAME: \&str = "mob_RustDesk";/g' libs/hbb_common/src/config.rs
+          sed -i 's/pub const CONFIG_NAME: \&str = "RustDesk";/pub const CONFIG_NAME: \&str = "mob_RustDesk";/g' libs/hbb_common/src/config.rs
+          sed -i 's/"rustdesk"/"mob_rustdesk"/g' libs/hbb_common/src/config.rs
+          
+          # 2. Inject Stable ID Manifest (Enables Registry Access)
+          cat <<EOF > flutter/windows/runner/Runner.exe.manifest
+          <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+          <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+            <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+              <security>
+                <requestedPrivileges>
+                  <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
+                </requestedPrivileges>
+              </security>
+            </trustInfo>
+            <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+              <application>
+                <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+              </application>
+            </compatibility>
+          </assembly>
+          EOF
+
+          # 3. Force Resource Compiler to include Manifest
+          echo '#define CREATEPROCESS_MANIFEST_RESOURCE_ID 1' > temp_rc
+          echo '#define RT_MANIFEST 24' >> temp_rc
+          echo 'CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "Runner.exe.manifest"' >> temp_rc
+          cat temp_rc flutter/windows/runner/Runner.rc > flutter/windows/runner/Runner_new.rc
+          mv flutter/windows/runner/Runner_new.rc flutter/windows/runner/Runner.rc
+          
+          echo "PATCH SUCCESS: Windows Isolation & ID-Fix applied."
 
       - name: Restore bridge files
         uses: actions/download-artifact@master
@@ -148,7 +178,6 @@ jobs:
         shell: bash
 
       - name: Build rustdesk
-        # srwe: python3 .\build.py --portable --hwcodec --flutter --vram --skip-portable-pack
         run: |
           python3 .\build.py --hwcodec --flutter --vram --skip-portable-pack
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
@@ -187,20 +216,11 @@ jobs:
         run: |
           mv rustdesk/rustdesk.exe rustdesk/mob_rustdesk.exe
 
-      - name: DEBUG - Check Windows Binary
-        # Dieser Schritt beweist, ob die Datei existiert
-        shell: bash
-        run: |
-          echo "Pruefe auf mob_rustdesk.exe..."
-          ls -lh rustdesk/mob_rustdesk.exe
-
       - name: Upload unsigned raw files
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: actions/upload-artifact@v4
         with:
-          # Eindeutiger Name, um Konflikte zu vermeiden
           name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
-          # WICHTIG: Nur die einzelne Datei hochladen, nicht den Ordner
           path: rustdesk/mob_rustdesk.exe
 
       - name: Build self-extracted executable
@@ -215,18 +235,10 @@ jobs:
           mkdir -p ./UnsignedOutput
           mv ./target/release/rustdesk-portable-packer.exe ./UnsignedOutput/mob_rustdesk.exe
 
-      - name: DEBUG - Check Packed Binary
-        # Dieser Schritt beweist, ob der Packer erfolgreich war
-        shell: bash
-        run: |
-          echo "Pruefe auf gepackte EXE..."
-          ls -lh UnsignedOutput/mob_rustdesk.exe
-
       - name: Upload Unsigned Self-Extracting EXE
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: actions/upload-artifact@v4
         with:
-          # Eindeutiger Name
           name: mob_RustDesk-Windows-SelfExtracting-Unsigned-${{ matrix.job.arch }}
           path: ./UnsignedOutput/mob_rustdesk.exe
 
@@ -265,11 +277,19 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Patch Config for Custom App Name
+      - name: Patch for Isolation and Stable ID (macOS)
         shell: bash
         run: |
-          sed -i '' 's/"RustDesk"/"mob_RustDesk"/g' libs/hbb_common/src/config.rs
-          echo "PATCH SUCCESS: App-Name changed to mob_RustDesk"
+          # 1. Deep Patch hbb_common
+          sed -i '' 's/pub const APP_NAME: \&str = "RustDesk";/pub const APP_NAME: \&str = "mob_RustDesk";/g' libs/hbb_common/src/config.rs
+          sed -i '' 's/pub const CONFIG_NAME: \&str = "RustDesk";/pub const CONFIG_NAME: \&str = "mob_RustDesk";/g' libs/hbb_common/src/config.rs
+          sed -i '' 's/"rustdesk"/"mob_rustdesk"/g' libs/hbb_common/src/config.rs
+          
+          # 2. Kill Sandbox to allow Hardware ID access
+          sed -i '' 's/<string>com.apple.security.app-sandbox<\/string>/<key>com.apple.security.app-sandbox<\/key><false\/>/g' flutter/macos/Runner/Release.entitlements || true
+          sed -i '' 's/<true\/>/<false\/>/g' flutter/macos/Runner/Release.entitlements
+          
+          echo "PATCH SUCCESS: macOS Isolation & Sandbox-Fix applied."
 
       - name: Install build runtime
         run: |
@@ -345,24 +365,16 @@ jobs:
           plutil -replace CFBundleExecutable -string "mob_RustDesk" mob_RustDesk.app/Contents/Info.plist
           plutil -replace CFBundleName -string "mob_RustDesk" mob_RustDesk.app/Contents/Info.plist
           plutil -replace CFBundleDisplayName -string "mob_RustDesk" mob_RustDesk.app/Contents/Info.plist
+          # Bundle ID ändern für vollständige Isolation
+          plutil -replace CFBundleIdentifier -string "com.mob.rustdesk" mob_RustDesk.app/Contents/Info.plist
 
       - name: DEBUG and COMPRESS App Bundle
-        # Wir erstellen manuell ein TGZ, um den "503 Too many files" Fehler der Artifact-Action zu umgehen
         run: |
           cd flutter/build/macos/Build/Products/Release/
-          echo "Erstelle Archiv fuer:"
-          ls -d mob_RustDesk.app
-          
-          # Manuelles packen
           tar -czf mob_RustDesk-macOS-${{ matrix.job.arch }}.tar.gz mob_RustDesk.app
-          
-          # Beweis, dass Datei existiert
-          ls -lh mob_RustDesk-macOS-${{ matrix.job.arch }}.tar.gz
 
       - name: Upload Portable App
         uses: actions/upload-artifact@v4
         with:
-          # Eindeutiger Name
           name: mob_RustDesk-macOS-App-${{ matrix.job.arch }}
-          # Upload der EINZELNEN gepackten Datei
           path: flutter/build/macos/Build/Products/Release/mob_RustDesk-macOS-${{ matrix.job.arch }}.tar.gz
